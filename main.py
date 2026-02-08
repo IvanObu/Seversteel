@@ -6,20 +6,24 @@ class DataPreprocessor:
 
         if not isinstance(Dframe, pd.DataFrame):
             raise TypeError(f"Ожидается pandas.DataFrame, получен {type(Dframe)}")
-
-        self.DataFrame = Dframe
+        self.DataFrame = Dframe.copy()
+        self.dropped_columns = []
+        self.ohe_columns = []
 
     def remove_missing(self, threshold: float = 0.5):
+        if not 0 <= threshold <= 1:
+            raise ValueError("threshold должен быть [0:1], а не {threshold}")
         df = self.DataFrame.copy()
         miss = df.isna().mean()
         df = df.loc[:, miss <= threshold]
+        self.dropped_columns = miss[miss > threshold].index.tolist()
 
         for col in df.columns:
             if df[col].isna().any():
                 if df[col].dtype.kind in "biufc":
-                    df[col].fillna(df[col].median(), inplace=True)
-                else:
-                    df[col].fillna(df[col].mode()[0], inplace=True)
+                    df.loc[:, col] = df[col].fillna(df[col].median())
+                else:  
+                    df.loc[:, col] = df[col].fillna(df[col].mode()[0])
 
         self.DataFrame = df
         return df
@@ -29,7 +33,7 @@ class DataPreprocessor:
         cat_col = df.select_dtypes(include=("object", "category")).columns
 
         df = pd.get_dummies(df, columns=cat_col)
-
+        self.ohe_columns = df.columns.tolist()
         self.DataFrame = df
         return df
 
@@ -59,10 +63,3 @@ class DataPreprocessor:
             print("Произошла ошибка при обработке DataFrame:", e)
             return None
 
-
-data_dicts = pd.DataFrame({"A": [1, 2, None], "B": [None, 5, 6], "C": ["x", None, "y"]})
-
-df_productss = "i"
-p = DataPreprocessor(df_products)
-
-print(p.remove_missing())
